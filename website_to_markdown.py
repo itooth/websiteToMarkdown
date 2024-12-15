@@ -16,15 +16,15 @@ def convert_to_markdown(url):
             'Authorization': f'Bearer {os.getenv("FIRECRAWL_API_KEY")}'
         }
         
-        # Request body - keeping it minimal
+        # Request body - keeping it minimal as per docs
         data = {
             "url": url,
             "formats": ["markdown"]
         }
         
         # Make the request
-        print(f"Making request to Firecrawl with data: {data}")  # Debug print
-        response = requests.post(api_url, headers=headers, json=data)
+        print(f"Making request to Firecrawl with data: {data}")
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
         
         # Print full response for debugging
         print(f"Response status code: {response.status_code}")

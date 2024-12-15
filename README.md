@@ -94,6 +94,51 @@ Key functionalities:
    - Formats and structures content
    - Removes irrelevant parts
 
+## Troubleshooting
+
+### Firecrawl API Issues
+
+1. **400 Bad Request - Unrecognized Keys**
+   - Problem: API rejects requests with extra configuration options
+   - Solution: Keep the request body minimal with only required fields:
+     ```json
+     {
+       "url": "https://example.com",
+       "formats": ["markdown"]
+     }
+     ```
+   - Note: Additional options like `javascript`, `renderDelay`, or `scrapeOptions` are not supported in the `/v1/scrape` endpoint
+
+2. **Partial Content from Dynamic Websites**
+   - Problem: Some websites (like Yuque) may return incomplete content
+   - Solutions:
+     - Try using the `/v1/crawl` endpoint instead of `/v1/scrape`
+     - Consider using the actions feature for interactive content
+     - Contact Firecrawl support for site-specific guidance
+
+3. **Timeout Issues**
+   - Problem: API requests timing out for complex pages
+   - Solutions:
+     - Increase the request timeout (e.g., `timeout=60`)
+     - Break down large pages into smaller sections
+     - Use batch processing for multiple URLs
+
+### Common Error Messages
+
+```json
+{
+  "success": false,
+  "error": "Bad Request",
+  "details": [{
+    "code": "unrecognized_keys",
+    "message": "Unrecognized key in body -- please review the v1 API documentation"
+  }]
+}
+```
+
+- This usually means you're including unsupported parameters
+- Refer to the [Firecrawl documentation](https://docs.firecrawl.dev) for the correct request format
+
 ## File Structure
 
 ```
