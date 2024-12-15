@@ -80,19 +80,21 @@
         <!-- Sidebar -->
         <div class="w-72 bg-white shadow-md border-r border-gray-200 flex flex-col h-screen">
             <!-- History Section -->
-            <div class="flex flex-col w-1/4 p-4 bg-white rounded-lg shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">History</h2>
-                    <div class="flex gap-2">
-                        <button onclick="toggleSelectAll()" class="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
-                            Select All
-                        </button>
-                        <button onclick="combineSelectedMarkdown()" class="px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600">
-                            Combine
-                        </button>
+            <div class="flex-1 overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">History</h2>
+                        <div class="flex gap-2">
+                            <button onclick="toggleSelectAll()" class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Select All
+                            </button>
+                            <button onclick="combineSelectedMarkdown()" class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600">
+                                Combine
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div id="historyList" class="space-y-2 overflow-y-auto max-h-[calc(100vh-200px)]">
+                <div id="historyList" class="flex-1 overflow-y-auto">
                     <!-- History items will be added here -->
                 </div>
             </div>
@@ -127,31 +129,27 @@
                 </div>
 
                 <div id="result" class="hidden">
-                    <div class="grid grid-cols-2 gap-6">
-                        <!-- Original Markdown Panel -->
-                        <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="grid grid-cols-2 gap-8">
+                        <!-- Original Markdown Section -->
+                        <div>
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-xl font-semibold">Original Markdown</h2>
-                                <button onclick="copyMarkdown('markdownOutput')" 
-                                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded">
+                                <button class="copy-button px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" data-target="markdownOutput">
                                     Copy Markdown
                                 </button>
                             </div>
-                            <div id="markdownOutput" 
-                                class="font-mono text-sm bg-gray-50 p-4 rounded-lg h-[600px] overflow-auto whitespace-pre-wrap"></div>
+                            <pre id="markdownOutput" class="bg-white p-4 rounded-lg shadow border border-gray-200 overflow-auto h-[500px] whitespace-pre-wrap"></pre>
                         </div>
 
-                        <!-- Cleaned Markdown Panel -->
-                        <div class="bg-white rounded-lg shadow-md p-6">
+                        <!-- Cleaned Markdown Section -->
+                        <div>
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-xl font-semibold">Cleaned Markdown</h2>
-                                <button onclick="copyMarkdown('cleanedMarkdownOutput')"
-                                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded">
+                                <button class="copy-button px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" data-target="cleanedMarkdownOutput">
                                     Copy Markdown
                                 </button>
                             </div>
-                            <div id="cleanedMarkdownOutput" 
-                                class="font-mono text-sm bg-gray-50 p-4 rounded-lg h-[600px] overflow-auto whitespace-pre-wrap"></div>
+                            <pre id="cleanedMarkdownOutput" class="bg-white p-4 rounded-lg shadow border border-gray-200 overflow-auto h-[500px] whitespace-pre-wrap"></pre>
                         </div>
                     </div>
                 </div>
@@ -199,33 +197,31 @@
             renderHistory();
         }
 
-        // Function to combine selected markdown content
+        // Function to combine selected markdown
         function combineSelectedMarkdown() {
             const selectedItems = history.filter((item, index) => {
                 const checkbox = document.querySelector(`input[data-id="${index}"]`);
                 return checkbox && checkbox.checked;
             });
 
-            if (selectedItems.length > 0) {
-                const combinedMarkdown = selectedItems.map(item => item.markdown).join('\n\n---\n\n');
-                const combinedCleanedMarkdown = selectedItems.map(item => item.cleanedMarkdown).join('\n\n---\n\n');
-                
-                document.getElementById('markdownOutput').textContent = combinedMarkdown;
-                document.getElementById('cleanedMarkdownOutput').textContent = combinedCleanedMarkdown;
-                updateCleaningPrompt(combinedMarkdown);
-                document.getElementById('result').classList.remove('hidden');
+            if (selectedItems.length === 0) {
+                alert('Please select items to combine');
+                return;
             }
-        }
 
-        // Function to update combine button visibility
-        function updateCombineButton() {
-            const checkedCount = document.querySelectorAll('#historyList input[type="checkbox"]:checked').length;
-            const combineBtn = document.getElementById('combineBtn');
-            if (checkedCount >= 2) {
-                combineBtn.classList.add('active');
-            } else {
-                combineBtn.classList.remove('active');
-            }
+            // Combine original markdown with separators
+            const combinedMarkdown = selectedItems.map(item => item.markdown).join('\n\n---\n\n');
+            
+            // Combine cleaned markdown with separators
+            const combinedCleanedMarkdown = selectedItems.map(item => item.cleanedMarkdown).join('\n\n---\n\n');
+            
+            // Update the output areas
+            document.getElementById('markdownOutput').textContent = combinedMarkdown;
+            document.getElementById('cleanedMarkdownOutput').textContent = combinedCleanedMarkdown;
+            document.getElementById('result').classList.remove('hidden');
+            
+            // Update the cleaning prompt with the combined markdown
+            updateCleaningPrompt(combinedMarkdown);
         }
 
         // Function to render history items
@@ -234,70 +230,33 @@
             historyList.innerHTML = '';
             
             history.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'history-item group hover:bg-gray-50 flex items-center pr-2';
-                div.setAttribute('data-id', index);
-                
-                // Checkbox
-                const checkboxWrapper = document.createElement('div');
-                checkboxWrapper.className = 'px-4 py-3 flex-shrink-0';
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'mr-2';
-                checkbox.setAttribute('data-id', index);
-                checkbox.addEventListener('change', updateCombineButton);
-                checkboxWrapper.appendChild(checkbox);
-                
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'cursor-pointer flex-1 py-3 min-w-0';
-                
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'font-medium text-gray-900 text-sm mb-1 truncate';
-                titleDiv.textContent = item.title || 'Untitled';
-                
-                const urlDiv = document.createElement('div');
-                urlDiv.className = 'text-xs text-gray-500 truncate';
-                const url = new URL(item.url);
-                const displayUrl = url.hostname + (url.pathname.length > 1 ? url.pathname : '');
-                urlDiv.textContent = displayUrl;
-                
-                // Delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn text-gray-400 hover:text-red-500 p-3 flex-shrink-0';
-                deleteBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                const li = document.createElement('div');
+                li.className = 'flex items-center px-4 py-2 hover:bg-gray-50 border-b border-gray-100 cursor-pointer';
+                li.innerHTML = `
+                    <input type="checkbox" data-id="${index}" class="form-checkbox h-4 w-4 text-blue-600 mr-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-sm truncate">${item.title || 'Untitled'}</div>
+                        <div class="text-xs text-gray-500 truncate">${item.url}</div>
+                    </div>
                 `;
-                deleteBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (confirm('Are you sure you want to delete this item?')) {
-                        history.splice(index, 1);
-                        localStorage.setItem('conversionHistory', JSON.stringify(history));
-                        renderHistory();
-                        updateCombineButton();
+
+                // Add click event to the item
+                li.addEventListener('click', (e) => {
+                    // Don't trigger if clicking checkbox
+                    if (e.target.type !== 'checkbox') {
+                        document.getElementById('urlInput').value = item.url;
+                        document.getElementById('markdownOutput').textContent = item.markdown;
+                        document.getElementById('cleanedMarkdownOutput').textContent = item.cleanedMarkdown;
+                        updateCleaningPrompt(item.markdown);
+                        document.getElementById('result').classList.remove('hidden');
                     }
-                };
-                
-                contentDiv.appendChild(titleDiv);
-                contentDiv.appendChild(urlDiv);
-                div.appendChild(checkboxWrapper);
-                div.appendChild(contentDiv);
-                div.appendChild(deleteBtn);
-                
-                contentDiv.addEventListener('click', () => {
-                    document.getElementById('urlInput').value = item.url;
-                    document.getElementById('markdownOutput').textContent = item.markdown;
-                    document.getElementById('cleanedMarkdownOutput').textContent = item.cleanedMarkdown;
-                    updateCleaningPrompt(item.markdown);
-                    document.getElementById('result').classList.remove('hidden');
                 });
-                
-                historyList.appendChild(div);
+
+                historyList.appendChild(li);
             });
-            
-            // Initialize Sortable
-            if (!window.historySortable) {
+
+            // Initialize Sortable if history is not empty
+            if (history.length > 0) {
                 window.historySortable = new Sortable(historyList, {
                     animation: 150,
                     onEnd: function(evt) {
@@ -405,6 +364,17 @@
             }
         }
 
+        // Function to toggle all checkboxes
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('#historyList input[type="checkbox"]');
+            // Check if any checkbox is unchecked
+            const anyUnchecked = Array.from(checkboxes).some(cb => !cb.checked);
+            // If any checkbox is unchecked, check all. Otherwise, uncheck all
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = anyUnchecked;
+            });
+        }
+
         // Update form submission to use the new convertUrl function
         document.getElementById('convertForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -412,9 +382,45 @@
             await convertUrl(url);
         });
 
-        // Add event listener for combine button
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('combineBtn').addEventListener('click', combineSelectedMarkdown);
+        // Function to copy text to clipboard
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                return false;
+            }
+        }
+
+        // Function to handle copy button clicks
+        async function handleCopyClick(buttonElement, textElement) {
+            const text = textElement.textContent;
+            const success = await copyToClipboard(text);
+            
+            if (success) {
+                const originalText = buttonElement.textContent;
+                buttonElement.textContent = 'Copied!';
+                buttonElement.classList.add('bg-green-500');
+                buttonElement.classList.remove('bg-blue-500');
+                
+                setTimeout(() => {
+                    buttonElement.textContent = originalText;
+                    buttonElement.classList.remove('bg-green-500');
+                    buttonElement.classList.add('bg-blue-500');
+                }, 2000);
+            } else {
+                alert('Failed to copy text. Please try again.');
+            }
+        }
+
+        // Add click handlers for copy buttons
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const textElement = document.getElementById(targetId);
+                handleCopyClick(this, textElement);
+            });
         });
 
         // Initial render of history
