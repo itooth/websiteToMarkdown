@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Website to Markdown Converter</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         .loading {
             display: none;
@@ -12,27 +13,42 @@
         .loading.active {
             display: block;
         }
+        .history-item {
+            cursor: move;
+        }
+        .history-item:hover .delete-btn {
+            display: block;
+        }
+        .delete-btn {
+            display: none;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div class="w-72 bg-white shadow-md p-4 overflow-auto">
-            <h2 class="text-lg font-semibold mb-4">History</h2>
-            <div id="historyList" class="space-y-2">
-                <!-- History items will be added here -->
+        <div class="w-72 bg-white shadow-md border-r border-gray-200 flex flex-col">
+            <!-- History Section -->
+            <div class="flex-1 overflow-auto">
+                <h2 class="text-lg font-semibold p-4 border-b border-gray-200">History</h2>
+                <div id="historyList" class="space-y-1">
+                    <!-- History items will be added here -->
+                </div>
             </div>
             
-            <!-- Cleaning Prompt Section -->
-            <div class="mt-8">
-                <h2 class="text-lg font-semibold mb-4">Cleaning Prompt</h2>
-                <div id="cleaningPrompt" class="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg"></div>
+            <!-- Cleaning Prompt Section - Fixed at bottom -->
+            <div class="border-t border-gray-200">
+                <h2 class="text-lg font-semibold p-4">Cleaning Prompt</h2>
+                <div id="cleaningPrompt" class="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 border-t border-gray-200 h-[150px] overflow-auto"></div>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 overflow-auto">
-            <div class="container mx-auto px-4 py-8">
+        <div class="flex-1 overflow-auto bg-gray-50">
+            <div class="max-w-6xl mx-auto px-6 py-8">
                 <h1 class="text-3xl font-bold text-center mb-8">Website to Markdown Converter</h1>
                 
                 <form id="convertForm" class="mb-8">
@@ -53,29 +69,31 @@
                 </div>
 
                 <div id="result" class="hidden">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Original Markdown -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Original Markdown Panel -->
                         <div class="bg-white rounded-lg shadow-md p-6">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-xl font-semibold">Original Markdown</h2>
-                                <button onclick="copyMarkdown('markdownOutput', this)" 
-                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 focus:outline-none">
+                                <button onclick="copyMarkdown('markdownOutput')" 
+                                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded">
                                     Copy Markdown
                                 </button>
                             </div>
-                            <div id="markdownOutput" class="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap h-[calc(100vh-300px)] overflow-auto"></div>
+                            <div id="markdownOutput" 
+                                class="font-mono text-sm bg-gray-50 p-4 rounded-lg h-[600px] overflow-auto whitespace-pre-wrap"></div>
                         </div>
 
-                        <!-- Cleaned Markdown -->
+                        <!-- Cleaned Markdown Panel -->
                         <div class="bg-white rounded-lg shadow-md p-6">
                             <div class="flex justify-between items-center mb-4">
                                 <h2 class="text-xl font-semibold">Cleaned Markdown</h2>
-                                <button onclick="copyMarkdown('cleanedMarkdownOutput', this)"
-                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 focus:outline-none">
+                                <button onclick="copyMarkdown('cleanedMarkdownOutput')"
+                                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded">
                                     Copy Markdown
                                 </button>
                             </div>
-                            <div id="cleanedMarkdownOutput" class="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap h-[calc(100vh-300px)] overflow-auto"></div>
+                            <div id="cleanedMarkdownOutput" 
+                                class="font-mono text-sm bg-gray-50 p-4 rounded-lg h-[600px] overflow-auto whitespace-pre-wrap"></div>
                         </div>
                     </div>
                 </div>
@@ -85,19 +103,20 @@
 
     <script>
         // Function to copy markdown content
-        function copyMarkdown(elementId, button) {
-            const content = document.getElementById(elementId);
-            navigator.clipboard.writeText(content.textContent)
-                .then(() => {
-                    const originalText = button.textContent;
-                    button.textContent = 'Copied!';
-                    setTimeout(() => {
-                        button.textContent = originalText;
-                    }, 2000);
-                })
-                .catch(err => {
-                    alert('Failed to copy text');
-                });
+        function copyMarkdown(elementId) {
+            const content = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                // Find the button that triggered this
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text:', err);
+                alert('Failed to copy text');
+            });
         }
 
         // Initialize history from localStorage
@@ -127,12 +146,16 @@
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '';
             
-            history.forEach((item) => {
+            history.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-gray-50 rounded cursor-pointer border border-gray-100 hover:border-gray-200';
+                div.className = 'history-item group px-4 py-2 hover:bg-gray-50 border-b border-gray-100 relative';
+                div.setAttribute('data-id', index);
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'cursor-pointer';
                 
                 const titleDiv = document.createElement('div');
-                titleDiv.className = 'font-medium text-gray-900 mb-1';
+                titleDiv.className = 'font-medium text-gray-900 text-sm mb-1';
                 titleDiv.textContent = item.title || 'Untitled';
                 
                 const urlDiv = document.createElement('div');
@@ -141,17 +164,51 @@
                 const displayUrl = url.hostname + (url.pathname.length > 1 ? url.pathname : '');
                 urlDiv.textContent = displayUrl;
                 
-                div.appendChild(titleDiv);
-                div.appendChild(urlDiv);
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 p-1';
+                deleteBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                `;
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm('Are you sure you want to delete this item?')) {
+                        history.splice(index, 1);
+                        localStorage.setItem('conversionHistory', JSON.stringify(history));
+                        renderHistory();
+                    }
+                };
                 
-                div.addEventListener('click', () => {
+                contentDiv.appendChild(titleDiv);
+                contentDiv.appendChild(urlDiv);
+                div.appendChild(contentDiv);
+                div.appendChild(deleteBtn);
+                
+                contentDiv.addEventListener('click', () => {
+                    document.getElementById('urlInput').value = item.url;
                     document.getElementById('markdownOutput').textContent = item.markdown;
                     document.getElementById('cleanedMarkdownOutput').textContent = item.cleanedMarkdown;
+                    updateCleaningPrompt(item.markdown);
                     document.getElementById('result').classList.remove('hidden');
                 });
                 
                 historyList.appendChild(div);
             });
+            
+            // Initialize Sortable
+            if (!window.historySortable) {
+                window.historySortable = new Sortable(historyList, {
+                    animation: 150,
+                    onEnd: function(evt) {
+                        const item = history[evt.oldIndex];
+                        history.splice(evt.oldIndex, 1);
+                        history.splice(evt.newIndex, 0, item);
+                        localStorage.setItem('conversionHistory', JSON.stringify(history));
+                    }
+                });
+            }
         }
 
         // Function to update cleaning prompt

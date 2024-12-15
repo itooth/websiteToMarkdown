@@ -11,6 +11,20 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# Enable hot reloading and disable template caching in development
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+@app.after_request
+def add_header(response):
+    """
+    Add headers to both force latest IE rendering engine or Chrome Frame,
+    and also to cache the rendered page for 10 minutes.
+    """
+    response.headers['X-UA-Compatible'] = 'IE=Edge,chrome=1'
+    response.headers['Cache-Control'] = 'public, max-age=0'
+    return response
+
 # Define cleaning prompt template
 CLEANING_PROMPT_TEMPLATE = """You will be given a page of text extracted from an open source project development guide. The text may contain irrelevant parts due to the extraction process. Your task is to clean up the text, remove irrelevant parts, and format it into Markdown.
 
