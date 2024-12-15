@@ -34,9 +34,48 @@
         .combine-btn.active {
             display: block;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            max-width: 400px;
+            width: 90%;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-semibold mb-4">Enter Password</h2>
+            <p class="text-gray-600 mb-4">You've reached the limit of 5 conversions. Please enter the password to continue using the AI cleaning feature.</p>
+            <input type="password" id="passwordInput" 
+                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500 mb-4"
+                placeholder="Enter password...">
+            <div class="flex justify-end">
+                <button onclick="checkPassword()" 
+                    class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none">
+                    Submit
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="flex h-screen">
         <!-- Sidebar -->
         <div class="w-72 bg-white shadow-md border-r border-gray-200 flex flex-col h-screen">
@@ -279,10 +318,36 @@
             updateCleaningPrompt('');
         });
 
-        // Update the cleaning prompt when we get new markdown
-        document.getElementById('convertForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const url = document.getElementById('urlInput').value;
+        // Password handling functions
+        async function checkPassword() {
+            const password = document.getElementById('passwordInput').value;
+            try {
+                const response = await fetch('/check_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `password=${encodeURIComponent(password)}`
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('passwordModal').classList.remove('active');
+                    document.getElementById('passwordInput').value = '';
+                    // Retry the last conversion
+                    const url = document.getElementById('urlInput').value;
+                    convertUrl(url);
+                } else {
+                    alert('Incorrect password. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error checking password:', error);
+                alert('Error checking password. Please try again.');
+            }
+        }
+
+        // Update the conversion function
+        async function convertUrl(url) {
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
             const markdownOutput = document.getElementById('markdownOutput');
@@ -304,9 +369,15 @@
 
                 if (data.success) {
                     markdownOutput.textContent = data.markdown;
-                    if (data.cleaned_markdown && !data.cleaned_markdown.startsWith('Error')) {
+                    
+                    if (data.requires_password) {
+                        // Show password modal
+                        document.getElementById('passwordModal').classList.add('active');
+                        cleanedMarkdownOutput.textContent = 'Please enter password to use AI cleaning...';
+                    } else if (data.cleaned_markdown && !data.cleaned_markdown.startsWith('Error')) {
                         cleanedMarkdownOutput.textContent = data.cleaned_markdown;
                         cleanedMarkdownOutput.classList.remove('text-red-500');
+                        updateHistory(url, data.markdown, data.cleaned_markdown, data.title);
                     } else {
                         cleanedMarkdownOutput.textContent = data.cleaned_markdown || 'Failed to clean markdown. Please try again.';
                         cleanedMarkdownOutput.classList.add('text-red-500');
@@ -316,7 +387,6 @@
                     updateCleaningPrompt(data.markdown);
                     
                     result.classList.remove('hidden');
-                    updateHistory(url, data.markdown, data.cleaned_markdown, data.title);
                 } else {
                     alert(data.error || 'Failed to convert webpage');
                     cleanedMarkdownOutput.textContent = 'Conversion failed';
@@ -329,6 +399,13 @@
             } finally {
                 loading.classList.remove('active');
             }
+        }
+
+        // Update form submission to use the new convertUrl function
+        document.getElementById('convertForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const url = document.getElementById('urlInput').value;
+            await convertUrl(url);
         });
 
         // Add event listener for combine button

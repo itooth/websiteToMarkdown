@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import markdown2
 from website_to_markdown import convert_to_markdown
 import re
@@ -10,10 +10,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)  # Required for session management
 
 # Enable hot reloading and disable template caching in development
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# Password for AI cleaning
+AI_PASSWORD = "9382"
+CONVERSIONS_LIMIT = 5
 
 @app.after_request
 def add_header(response):
@@ -24,6 +29,14 @@ def add_header(response):
     response.headers['X-UA-Compatible'] = 'IE=Edge,chrome=1'
     response.headers['Cache-Control'] = 'public, max-age=0'
     return response
+
+@app.route('/check_password', methods=['POST'])
+def check_password():
+    password = request.form.get('password')
+    if password == AI_PASSWORD:
+        session['conversions_count'] = 0  # Reset count when password is correct
+        return jsonify({'success': True})
+    return jsonify({'success': False})
 
 # Define cleaning prompt template
 CLEANING_PROMPT_TEMPLATE = """You will be given a page of text extracted from an open source project development guide. The text may contain irrelevant parts due to the extraction process. Your task is to clean up the text, remove irrelevant parts, and format it into Markdown.
@@ -117,6 +130,9 @@ def clean_markdown_with_ai(markdown_content, webpage_url):
 
 @app.route('/')
 def index():
+    # Initialize conversions count if not exists
+    if 'conversions_count' not in session:
+        session['conversions_count'] = 0
     return render_template('index.html', cleaning_prompt=CLEANING_PROMPT_TEMPLATE)
 
 @app.route('/convert', methods=['POST'])
@@ -131,8 +147,18 @@ def convert():
         
         if markdown_content:
             try:
-                # Clean the markdown using AI
-                cleaned_markdown = clean_markdown_with_ai(markdown_content, url)
+                # Check conversions count
+                conversions_count = session.get('conversions_count', 0)
+                needs_password = conversions_count >= CONVERSIONS_LIMIT
+                
+                # Clean the markdown using AI if allowed
+                if needs_password:
+                    cleaned_markdown = markdown_content  # Don't clean if password needed
+                    requires_password = True
+                else:
+                    cleaned_markdown = clean_markdown_with_ai(markdown_content, url)
+                    session['conversions_count'] = conversions_count + 1
+                    requires_password = False
                 
                 # Convert both original and cleaned markdown to HTML for preview
                 html_content = markdown2.markdown(markdown_content)
@@ -144,7 +170,7 @@ def convert():
                 if title_match:
                     title = title_match.group(1)
                 
-                # Get the cleaning prompt with the actual URL
+                # Get the cleaning prompt with the actual markdown content
                 current_cleaning_prompt = CLEANING_PROMPT_TEMPLATE.format(markdown_content=markdown_content)
                 
                 return jsonify({
@@ -154,7 +180,8 @@ def convert():
                     'cleaned_markdown': cleaned_markdown,
                     'cleaned_html': cleaned_html,
                     'title': title,
-                    'cleaning_prompt': current_cleaning_prompt
+                    'cleaning_prompt': current_cleaning_prompt,
+                    'requires_password': requires_password
                 })
             except Exception as e:
                 print(f"Error in markdown processing: {str(e)}")
