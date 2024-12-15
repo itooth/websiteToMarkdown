@@ -11,54 +11,13 @@ A web application that converts web pages to Markdown format with AI-powered cle
   - Drag-and-drop reordering
   - Multiple selection and combining
   - Delete functionality
-  - Persistent storage
+  - Browser-based storage (localStorage)
 - Copy to clipboard functionality
 - Real-time preview
 
-## Key Components
-
-### Backend (app.py)
-
-- Flask web server with hot reloading
-- Integration with Firecrawl API for webpage conversion
-- Integration with ChatAnywhere API for AI cleaning
-- Environment variable management
-
-### Frontend (templates/index.html)
-
-Key functionalities:
-
-1. **History Management**
-   ```javascript
-   // Initialize history from localStorage
-   let history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
-   ```
-   - Stores up to 50 recent conversions
-   - Persists data in localStorage
-   - Supports drag-and-drop reordering using Sortable.js
-
-2. **Multiple Selection and Combining**
-   ```javascript
-   function combineSelectedMarkdown() {
-       const selectedItems = history.filter((item, index) => {
-           const checkbox = document.querySelector(`input[data-id="${index}"]`);
-           return checkbox && checkbox.checked;
-       });
-       // Combines markdown with separators
-       const combinedMarkdown = selectedItems.map(item => item.markdown).join('\n\n---\n\n');
-   }
-   ```
-   - Select multiple history items
-   - Combine them with separators
-   - Update both original and cleaned panels
-
-3. **Markdown Cleaning Process**
-   - Uses AI to clean and format markdown
-   - Removes irrelevant content
-   - Improves formatting and structure
-   - Preserves important content
-
 ## Setup
+
+### Local Development
 
 1. Install dependencies:
    ```bash
@@ -75,6 +34,123 @@ Key functionalities:
    ```bash
    python dev_server.py
    ```
+
+### Docker Setup
+
+1. Pull and run the Docker image:
+   ```bash
+   docker run -p 5001:5001 \
+     -e FIRECRAWL_API_KEY=your_firecrawl_api_key \
+     -e CHATANYWHERE_API_KEY=your_chatanywhere_api_key \
+     kim0809/websitetomarkdown
+   ```
+
+2. Access the application at `http://localhost:5001`
+
+#### Data Persistence in Docker
+
+By default, the history data is stored in the browser's localStorage, which means:
+- Data persists across browser sessions
+- Data is tied to the browser, not the container
+- Data is not shared between different browsers or devices
+- Data survives container restarts as it's stored client-side
+
+For persistent server-side storage, you have several options:
+
+1. **Using Docker Volume for File-based Storage**:
+   ```bash
+   # Create a volume
+   docker volume create markdown-history
+
+   # Run container with volume
+   docker run -p 5001:5001 \
+     -v markdown-history:/app/data \
+     -e FIRECRAWL_API_KEY=your_key \
+     -e CHATANYWHERE_API_KEY=your_key \
+     kim0809/websitetomarkdown
+   ```
+
+2. **Using External Database**:
+   - Set up a MongoDB or SQLite database
+   - Mount the database file as a volume
+   - Configure database connection in environment variables
+
+3. **Using Host Directory**:
+   ```bash
+   # Mount a host directory
+   docker run -p 5001:5001 \
+     -v /path/to/host/data:/app/data \
+     -e FIRECRAWL_API_KEY=your_key \
+     -e CHATANYWHERE_API_KEY=your_key \
+     kim0809/websitetomarkdown
+   ```
+
+### Building Docker Image Locally
+
+1. Clone the repository
+2. Build the image:
+   ```bash
+   docker build -t kim0809/websitetomarkdown .
+   ```
+3. Run the container:
+   ```bash
+   docker run -p 5001:5001 \
+     -e FIRECRAWL_API_KEY=your_firecrawl_api_key \
+     -e CHATANYWHERE_API_KEY=your_chatanywhere_api_key \
+     kim0809/websitetomarkdown
+   ```
+
+## Code Structure
+
+```
+.
+├── app.py                  # Main Flask application
+├── dev_server.py           # Development server with hot reloading
+├── website_to_markdown.py  # Firecrawl API integration
+├── .env                    # Environment variables (not in repo)
+├── Dockerfile             # Docker configuration
+├── requirements.txt       # Python dependencies
+├── .dockerignore         # Files to exclude from Docker build
+└── templates/
+    └── index.html        # Frontend interface
+```
+
+### Code Documentation
+
+#### Dockerfile
+```dockerfile
+FROM python:3.9-slim          # Base image with Python 3.9
+WORKDIR /app                  # Set working directory
+COPY requirements.txt .       # Copy dependencies file
+RUN pip install --no-cache-dir -r requirements.txt  # Install dependencies
+COPY . .                     # Copy application code
+EXPOSE 5001                  # Expose application port
+CMD ["python", "app.py"]     # Start the application
+```
+
+#### Key Components
+
+1. **Backend (app.py)**
+   - Flask web server with hot reloading
+   - Integration with Firecrawl API for webpage conversion
+   - Integration with ChatAnywhere API for AI cleaning
+   - Environment variable management
+
+2. **Frontend (templates/index.html)**
+   - History Management using localStorage
+   - Multiple Selection and Combining functionality
+   - Real-time Markdown preview
+   - Drag-and-drop reordering using Sortable.js
+
+3. **Development Server (dev_server.py)**
+   - Implements hot reloading for development
+   - Watches for file changes
+   - Automatically restarts server when needed
+
+4. **API Integration (website_to_markdown.py)**
+   - Handles Firecrawl API requests
+   - Processes webpage to Markdown conversion
+   - Manages API authentication and error handling
 
 ## Development
 
@@ -107,46 +183,48 @@ Key functionalities:
        "formats": ["markdown"]
      }
      ```
-   - Note: Additional options like `javascript`, `renderDelay`, or `scrapeOptions` are not supported in the `/v1/scrape` endpoint
 
 2. **Partial Content from Dynamic Websites**
-   - Problem: Some websites (like Yuque) may return incomplete content
+   - Problem: Some websites may return incomplete content
    - Solutions:
-     - Try using the `/v1/crawl` endpoint instead of `/v1/scrape`
-     - Consider using the actions feature for interactive content
-     - Contact Firecrawl support for site-specific guidance
+     - Try using the `/v1/crawl` endpoint
+     - Consider using the actions feature
+     - Contact Firecrawl support for guidance
 
 3. **Timeout Issues**
    - Problem: API requests timing out for complex pages
    - Solutions:
-     - Increase the request timeout (e.g., `timeout=60`)
-     - Break down large pages into smaller sections
-     - Use batch processing for multiple URLs
+     - Increase request timeout
+     - Break down large pages
+     - Use batch processing
 
-### Common Error Messages
+### Docker Issues
 
-```json
-{
-  "success": false,
-  "error": "Bad Request",
-  "details": [{
-    "code": "unrecognized_keys",
-    "message": "Unrecognized key in body -- please review the v1 API documentation"
-  }]
-}
-```
+1. **Container Not Starting**
+   - Check if environment variables are properly set
+   - Verify port 5001 is not in use
+   - Check Docker logs: `docker logs <container_id>`
 
-- This usually means you're including unsupported parameters
-- Refer to the [Firecrawl documentation](https://docs.firecrawl.dev) for the correct request format
+2. **API Connection Issues**
+   - Verify API keys are correctly passed to container
+   - Check network connectivity
+   - Ensure API endpoints are accessible
 
-## File Structure
+3. **Performance Issues**
+   - Container resource limits can be adjusted:
+     ```bash
+     docker run -p 5001:5001 \
+       --memory=1g \
+       --cpus=1 \
+       -e FIRECRAWL_API_KEY=your_key \
+       -e CHATANYWHERE_API_KEY=your_key \
+       kim0809/websitetomarkdown
+     ```
 
-```
-.
-├── app.py              # Main Flask application
-├── dev_server.py       # Development server with hot reloading
-├── website_to_markdown.py  # Firecrawl API integration
-├── .env               # Environment variables
-└── templates/
-    └── index.html     # Frontend interface
-```
+4. **Data Persistence Issues**
+   - History data is stored in browser's localStorage by default
+   - To persist data across devices or share between users:
+     - Use Docker volumes for file-based storage
+     - Set up an external database
+     - Mount a host directory
+   - Clear browser cache/localStorage if history becomes corrupted
