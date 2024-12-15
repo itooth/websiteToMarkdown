@@ -22,6 +22,12 @@
             <div id="historyList" class="space-y-2">
                 <!-- History items will be added here -->
             </div>
+            
+            <!-- Cleaning Prompt Section -->
+            <div class="mt-8">
+                <h2 class="text-lg font-semibold mb-4">Cleaning Prompt</h2>
+                <div id="cleaningPrompt" class="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg"></div>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -48,10 +54,11 @@
 
                 <div id="result" class="hidden">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Original Markdown -->
                         <div class="bg-white rounded-lg shadow-md p-6">
                             <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold">Markdown Output</h2>
-                                <button id="copyButton" 
+                                <h2 class="text-xl font-semibold">Original Markdown</h2>
+                                <button onclick="copyMarkdown('markdownOutput', this)" 
                                     class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 focus:outline-none">
                                     Copy Markdown
                                 </button>
@@ -59,9 +66,16 @@
                             <div id="markdownOutput" class="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap h-[calc(100vh-300px)] overflow-auto"></div>
                         </div>
 
+                        <!-- Cleaned Markdown -->
                         <div class="bg-white rounded-lg shadow-md p-6">
-                            <h2 class="text-xl font-semibold mb-4">Preview</h2>
-                            <div id="htmlPreview" class="prose max-w-none h-[calc(100vh-300px)] overflow-auto"></div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold">Cleaned Markdown</h2>
+                                <button onclick="copyMarkdown('cleanedMarkdownOutput', this)"
+                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 focus:outline-none">
+                                    Copy Markdown
+                                </button>
+                            </div>
+                            <div id="cleanedMarkdownOutput" class="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap h-[calc(100vh-300px)] overflow-auto"></div>
                         </div>
                     </div>
                 </div>
@@ -70,29 +84,41 @@
     </div>
 
     <script>
+        // Function to copy markdown content
+        function copyMarkdown(elementId, button) {
+            const content = document.getElementById(elementId);
+            navigator.clipboard.writeText(content.textContent)
+                .then(() => {
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                    }, 2000);
+                })
+                .catch(err => {
+                    alert('Failed to copy text');
+                });
+        }
+
         // Initialize history from localStorage
         let history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
         
         // Function to update history in UI and localStorage
-        function updateHistory(url, markdown, title) {
-            // Add to history array
+        function updateHistory(url, markdown, cleanedMarkdown, title) {
             const historyItem = {
                 url: url,
                 markdown: markdown,
+                cleanedMarkdown: cleanedMarkdown,
                 title: title,
                 timestamp: new Date().toISOString()
             };
-            history.unshift(historyItem); // Add to beginning of array
+            history.unshift(historyItem);
             
-            // Keep only last 50 items
             if (history.length > 50) {
                 history = history.slice(0, 50);
             }
             
-            // Save to localStorage
             localStorage.setItem('conversionHistory', JSON.stringify(history));
-            
-            // Update UI
             renderHistory();
         }
 
@@ -101,30 +127,26 @@
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '';
             
-            history.forEach((item, index) => {
+            history.forEach((item) => {
                 const div = document.createElement('div');
                 div.className = 'p-3 hover:bg-gray-50 rounded cursor-pointer border border-gray-100 hover:border-gray-200';
                 
-                // Create title element
                 const titleDiv = document.createElement('div');
                 titleDiv.className = 'font-medium text-gray-900 mb-1';
                 titleDiv.textContent = item.title || 'Untitled';
                 
-                // Create URL element with truncation
                 const urlDiv = document.createElement('div');
                 urlDiv.className = 'text-xs text-gray-500 truncate';
                 const url = new URL(item.url);
                 const displayUrl = url.hostname + (url.pathname.length > 1 ? url.pathname : '');
                 urlDiv.textContent = displayUrl;
                 
-                // Add elements to container
                 div.appendChild(titleDiv);
                 div.appendChild(urlDiv);
                 
-                // Add click handler
                 div.addEventListener('click', () => {
                     document.getElementById('markdownOutput').textContent = item.markdown;
-                    document.getElementById('htmlPreview').innerHTML = markdown2Html(item.markdown);
+                    document.getElementById('cleanedMarkdownOutput').textContent = item.cleanedMarkdown;
                     document.getElementById('result').classList.remove('hidden');
                 });
                 
@@ -132,23 +154,26 @@
             });
         }
 
-        // Function to convert markdown to HTML (simple version)
-        function markdown2Html(markdown) {
-            return marked.parse(markdown);
+        // Function to update cleaning prompt
+        function updateCleaningPrompt(markdown) {
+            const promptTemplate = {{ cleaning_prompt|tojson }};
+            const prompt = promptTemplate.replace('{markdown_content}', markdown || 'No content yet...');
+            document.getElementById('cleaningPrompt').textContent = prompt;
         }
 
-        // Load marked library for markdown conversion
-        const markedScript = document.createElement('script');
-        markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
-        document.head.appendChild(markedScript);
+        // Update cleaning prompt when markdown changes
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCleaningPrompt('');
+        });
 
-        document.getElementById('convertForm').addEventListener('submit', async (e) => {
+        // Update the cleaning prompt when we get new markdown
+        document.getElementById('convertForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const url = document.getElementById('urlInput').value;
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
             const markdownOutput = document.getElementById('markdownOutput');
-            const htmlPreview = document.getElementById('htmlPreview');
+            const cleanedMarkdownOutput = document.getElementById('cleanedMarkdownOutput');
 
             loading.classList.add('active');
             result.classList.add('hidden');
@@ -166,34 +191,31 @@
 
                 if (data.success) {
                     markdownOutput.textContent = data.markdown;
-                    htmlPreview.innerHTML = data.html;
-                    result.classList.remove('hidden');
+                    if (data.cleaned_markdown && !data.cleaned_markdown.startsWith('Error')) {
+                        cleanedMarkdownOutput.textContent = data.cleaned_markdown;
+                        cleanedMarkdownOutput.classList.remove('text-red-500');
+                    } else {
+                        cleanedMarkdownOutput.textContent = data.cleaned_markdown || 'Failed to clean markdown. Please try again.';
+                        cleanedMarkdownOutput.classList.add('text-red-500');
+                    }
                     
-                    // Add to history with title
-                    updateHistory(url, data.markdown, data.title);
+                    // Update cleaning prompt with the current markdown content
+                    updateCleaningPrompt(data.markdown);
+                    
+                    result.classList.remove('hidden');
+                    updateHistory(url, data.markdown, data.cleaned_markdown, data.title);
                 } else {
                     alert(data.error || 'Failed to convert webpage');
+                    cleanedMarkdownOutput.textContent = 'Conversion failed';
+                    cleanedMarkdownOutput.classList.add('text-red-500');
                 }
             } catch (error) {
                 alert('An error occurred while converting the webpage');
+                cleanedMarkdownOutput.textContent = 'An error occurred during conversion';
+                cleanedMarkdownOutput.classList.add('text-red-500');
             } finally {
                 loading.classList.remove('active');
             }
-        });
-
-        document.getElementById('copyButton').addEventListener('click', () => {
-            const markdownOutput = document.getElementById('markdownOutput');
-            navigator.clipboard.writeText(markdownOutput.textContent)
-                .then(() => {
-                    const copyButton = document.getElementById('copyButton');
-                    copyButton.textContent = 'Copied!';
-                    setTimeout(() => {
-                        copyButton.textContent = 'Copy Markdown';
-                    }, 2000);
-                })
-                .catch(err => {
-                    alert('Failed to copy text');
-                });
         });
 
         // Initial render of history

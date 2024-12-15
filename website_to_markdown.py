@@ -16,20 +16,36 @@ def convert_to_markdown(url):
             'Authorization': f'Bearer {os.getenv("FIRECRAWL_API_KEY")}'
         }
         
-        # Request body
+        # Request body - keeping it minimal
         data = {
             "url": url,
             "formats": ["markdown"]
         }
         
         # Make the request
+        print(f"Making request to Firecrawl with data: {data}")  # Debug print
         response = requests.post(api_url, headers=headers, json=data)
-        response_json = response.json()
+        
+        # Print full response for debugging
+        print(f"Response status code: {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
+        
+        try:
+            response_json = response.json()
+            print("Response JSON:", response_json)
+        except Exception as e:
+            print(f"Failed to parse response as JSON: {str(e)}")
+            print("Raw response:", response.text)
+            return None
         
         if response_json.get('success'):
             return response_json['data']['markdown']
         else:
-            print(f"API Error: {response_json}")
+            error_msg = response_json.get('error', 'Unknown error')
+            details = response_json.get('details', [])
+            if details and isinstance(details, list):
+                error_msg = f"{error_msg}: {'; '.join(str(d) for d in details)}"
+            print(f"API Error: {error_msg}")
             return None
     
     except Exception as e:
