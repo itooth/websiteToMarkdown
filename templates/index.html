@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website to Markdown Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-72 bg-white shadow-md p-4 overflow-auto">
+            <h2 class="text-lg font-semibold mb-4">History</h2>
+            <div id="historyList" class="space-y-2">
+                <!-- History items will be added here -->
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto">
+            <div class="container mx-auto px-4 py-8">
+                <h1 class="text-3xl font-bold text-center mb-8">Website to Markdown Converter</h1>
+                
+                <form id="convertForm" class="mb-8">
+                    <div class="flex gap-4">
+                        <input type="url" id="urlInput" required
+                            class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500"
+                            placeholder="Enter website URL...">
+                        <button type="submit"
+                            class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none">
+                            Convert
+                        </button>
+                    </div>
+                </form>
+
+                <div id="loading" class="loading text-center mb-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <p class="mt-2">Converting...</p>
+                </div>
+
+                <div id="result" class="hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold">Markdown Output</h2>
+                                <button id="copyButton" 
+                                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 focus:outline-none">
+                                    Copy Markdown
+                                </button>
+                            </div>
+                            <div id="markdownOutput" class="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap h-[calc(100vh-300px)] overflow-auto"></div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h2 class="text-xl font-semibold mb-4">Preview</h2>
+                            <div id="htmlPreview" class="prose max-w-none h-[calc(100vh-300px)] overflow-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize history from localStorage
+        let history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
+        
+        // Function to update history in UI and localStorage
+        function updateHistory(url, markdown, title) {
+            // Add to history array
+            const historyItem = {
+                url: url,
+                markdown: markdown,
+                title: title,
+                timestamp: new Date().toISOString()
+            };
+            history.unshift(historyItem); // Add to beginning of array
+            
+            // Keep only last 50 items
+            if (history.length > 50) {
+                history = history.slice(0, 50);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('conversionHistory', JSON.stringify(history));
+            
+            // Update UI
+            renderHistory();
+        }
+
+        // Function to render history items
+        function renderHistory() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+            
+            history.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-3 hover:bg-gray-50 rounded cursor-pointer border border-gray-100 hover:border-gray-200';
+                
+                // Create title element
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'font-medium text-gray-900 mb-1';
+                titleDiv.textContent = item.title || 'Untitled';
+                
+                // Create URL element with truncation
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'text-xs text-gray-500 truncate';
+                const url = new URL(item.url);
+                const displayUrl = url.hostname + (url.pathname.length > 1 ? url.pathname : '');
+                urlDiv.textContent = displayUrl;
+                
+                // Add elements to container
+                div.appendChild(titleDiv);
+                div.appendChild(urlDiv);
+                
+                // Add click handler
+                div.addEventListener('click', () => {
+                    document.getElementById('markdownOutput').textContent = item.markdown;
+                    document.getElementById('htmlPreview').innerHTML = markdown2Html(item.markdown);
+                    document.getElementById('result').classList.remove('hidden');
+                });
+                
+                historyList.appendChild(div);
+            });
+        }
+
+        // Function to convert markdown to HTML (simple version)
+        function markdown2Html(markdown) {
+            return marked.parse(markdown);
+        }
+
+        // Load marked library for markdown conversion
+        const markedScript = document.createElement('script');
+        markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+        document.head.appendChild(markedScript);
+
+        document.getElementById('convertForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('urlInput').value;
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const markdownOutput = document.getElementById('markdownOutput');
+            const htmlPreview = document.getElementById('htmlPreview');
+
+            loading.classList.add('active');
+            result.classList.add('hidden');
+
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `url=${encodeURIComponent(url)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    markdownOutput.textContent = data.markdown;
+                    htmlPreview.innerHTML = data.html;
+                    result.classList.remove('hidden');
+                    
+                    // Add to history with title
+                    updateHistory(url, data.markdown, data.title);
+                } else {
+                    alert(data.error || 'Failed to convert webpage');
+                }
+            } catch (error) {
+                alert('An error occurred while converting the webpage');
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        document.getElementById('copyButton').addEventListener('click', () => {
+            const markdownOutput = document.getElementById('markdownOutput');
+            navigator.clipboard.writeText(markdownOutput.textContent)
+                .then(() => {
+                    const copyButton = document.getElementById('copyButton');
+                    copyButton.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyButton.textContent = 'Copy Markdown';
+                    }, 2000);
+                })
+                .catch(err => {
+                    alert('Failed to copy text');
+                });
+        });
+
+        // Initial render of history
+        renderHistory();
+    </script>
+</body>
+</html> 
