@@ -25,16 +25,31 @@
         .sortable-ghost {
             opacity: 0.4;
         }
+        .checkbox-wrapper {
+            padding: 0 8px;
+        }
+        .combine-btn {
+            display: none;
+        }
+        .combine-btn.active {
+            display: block;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div class="w-72 bg-white shadow-md border-r border-gray-200 flex flex-col">
+        <div class="w-72 bg-white shadow-md border-r border-gray-200 flex flex-col h-screen">
             <!-- History Section -->
-            <div class="flex-1 overflow-auto">
-                <h2 class="text-lg font-semibold p-4 border-b border-gray-200">History</h2>
-                <div id="historyList" class="space-y-1">
+            <div class="flex-1">
+                <div class="bg-white">
+                    <h2 class="text-lg font-semibold p-4 border-b border-gray-200">History</h2>
+                    <button id="combineBtn" 
+                        class="combine-btn w-full bg-blue-500 text-white px-4 py-2 text-sm hover:bg-blue-600 transition-colors">
+                        Combine Selected
+                    </button>
+                </div>
+                <div id="historyList" class="divide-y divide-gray-100">
                     <!-- History items will be added here -->
                 </div>
             </div>
@@ -141,6 +156,35 @@
             renderHistory();
         }
 
+        // Function to combine selected markdown content
+        function combineSelectedMarkdown() {
+            const selectedItems = history.filter((item, index) => {
+                const checkbox = document.querySelector(`input[data-id="${index}"]`);
+                return checkbox && checkbox.checked;
+            });
+
+            if (selectedItems.length > 0) {
+                const combinedMarkdown = selectedItems.map(item => item.markdown).join('\n\n---\n\n');
+                const combinedCleanedMarkdown = selectedItems.map(item => item.cleanedMarkdown).join('\n\n---\n\n');
+                
+                document.getElementById('markdownOutput').textContent = combinedMarkdown;
+                document.getElementById('cleanedMarkdownOutput').textContent = combinedCleanedMarkdown;
+                updateCleaningPrompt(combinedMarkdown);
+                document.getElementById('result').classList.remove('hidden');
+            }
+        }
+
+        // Function to update combine button visibility
+        function updateCombineButton() {
+            const checkedCount = document.querySelectorAll('#historyList input[type="checkbox"]:checked').length;
+            const combineBtn = document.getElementById('combineBtn');
+            if (checkedCount >= 2) {
+                combineBtn.classList.add('active');
+            } else {
+                combineBtn.classList.remove('active');
+            }
+        }
+
         // Function to render history items
         function renderHistory() {
             const historyList = document.getElementById('historyList');
@@ -148,14 +192,24 @@
             
             history.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = 'history-item group px-4 py-2 hover:bg-gray-50 border-b border-gray-100 relative';
+                div.className = 'history-item group hover:bg-gray-50 flex items-center pr-2';
                 div.setAttribute('data-id', index);
                 
+                // Checkbox
+                const checkboxWrapper = document.createElement('div');
+                checkboxWrapper.className = 'px-4 py-3 flex-shrink-0';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'mr-2';
+                checkbox.setAttribute('data-id', index);
+                checkbox.addEventListener('change', updateCombineButton);
+                checkboxWrapper.appendChild(checkbox);
+                
                 const contentDiv = document.createElement('div');
-                contentDiv.className = 'cursor-pointer';
+                contentDiv.className = 'cursor-pointer flex-1 py-3 min-w-0';
                 
                 const titleDiv = document.createElement('div');
-                titleDiv.className = 'font-medium text-gray-900 text-sm mb-1';
+                titleDiv.className = 'font-medium text-gray-900 text-sm mb-1 truncate';
                 titleDiv.textContent = item.title || 'Untitled';
                 
                 const urlDiv = document.createElement('div');
@@ -166,7 +220,7 @@
                 
                 // Delete button
                 const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 p-1';
+                deleteBtn.className = 'delete-btn text-gray-400 hover:text-red-500 p-3 flex-shrink-0';
                 deleteBtn.innerHTML = `
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -178,11 +232,13 @@
                         history.splice(index, 1);
                         localStorage.setItem('conversionHistory', JSON.stringify(history));
                         renderHistory();
+                        updateCombineButton();
                     }
                 };
                 
                 contentDiv.appendChild(titleDiv);
                 contentDiv.appendChild(urlDiv);
+                div.appendChild(checkboxWrapper);
                 div.appendChild(contentDiv);
                 div.appendChild(deleteBtn);
                 
@@ -273,6 +329,11 @@
             } finally {
                 loading.classList.remove('active');
             }
+        });
+
+        // Add event listener for combine button
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('combineBtn').addEventListener('click', combineSelectedMarkdown);
         });
 
         // Initial render of history
