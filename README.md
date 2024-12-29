@@ -1,3 +1,5 @@
+python app.py
+
 # Website to Markdown Converter
 
 A web application that converts web pages to Markdown format with AI-powered cleaning and formatting.
