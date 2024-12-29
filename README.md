@@ -37,15 +37,21 @@ python dev_server.py
 
 ### Docker Setup
 
-Run with Docker:
-```bash
-docker run -p 5001:5001 \
-  -e FIRECRAWL_API_KEY=your_firecrawl_api_key \
-  -e CHATANYWHERE_API_KEY=your_chatanywhere_api_key \
-  kim0809/websitetomarkdown
-```
 
-Access at `http://localhost:5001`
+
+#### Using Docker Compose (Recommended)
+1. Make sure you have Docker and Docker Compose installed
+2. Create `.env` file with your API keys
+3. Run:
+   ```bash
+   docker compose up
+   ```
+   - Use `-d` flag to run in background: `docker compose up -d`
+   - To rebuild: `docker compose up --build`
+   - To stop: `docker compose down`
+
+
+Access the application at `http://localhost:5001`
 
 ## Project Structure
 
@@ -55,6 +61,8 @@ Access at `http://localhost:5001`
 ├── dev_server.py          # Development server with hot reloading
 ├── website_to_markdown.py # Firecrawl API integration
 ├── requirements.txt       # Python dependencies
+├── Dockerfile            # Docker container configuration
+├── docker-compose.yml    # Docker Compose configuration
 └── templates/
     └── index.html        # Frontend interface
 ```
